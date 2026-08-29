@@ -75,6 +75,16 @@ func buildCodexPromptPreamble(systemPrompt string, appendPrompt string) string {
 	return strings.Join(sections, "\n\n")
 }
 
+func joinCodexPromptSections(sections ...string) string {
+	filtered := make([]string, 0, len(sections))
+	for _, section := range sections {
+		if trimmed := strings.TrimSpace(section); trimmed != "" {
+			filtered = append(filtered, trimmed)
+		}
+	}
+	return strings.Join(filtered, "\n\n")
+}
+
 func prependCodexPromptPreamble(prompt string, preamble string) string {
 	preamble = strings.TrimSpace(preamble)
 	if preamble == "" {

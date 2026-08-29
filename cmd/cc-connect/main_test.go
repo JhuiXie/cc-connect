@@ -176,7 +176,7 @@ func TestBuildAgentOptionsInjectsProjectScope(t *testing.T) {
 		},
 	}
 
-	got := buildAgentOptions("/tmp/data", proj)
+	got := buildAgentOptions("/tmp/data", proj, "zh")
 
 	if got["cc_data_dir"] != "/tmp/data" {
 		t.Fatalf("cc_data_dir = %v, want %q", got["cc_data_dir"], "/tmp/data")
@@ -184,11 +184,28 @@ func TestBuildAgentOptionsInjectsProjectScope(t *testing.T) {
 	if got["cc_project"] != "demo-project" {
 		t.Fatalf("cc_project = %v, want %q", got["cc_project"], "demo-project")
 	}
+	if got["language"] != "zh" {
+		t.Fatalf("language = %v, want %q", got["language"], "zh")
+	}
 	if got["work_dir"] != "/tmp/work" || got["model"] != "gpt-test" {
 		t.Fatalf("buildAgentOptions() lost existing options: %v", got)
 	}
 	if _, exists := proj.Agent.Options["cc_data_dir"]; exists {
 		t.Fatalf("project agent options mutated: %v", proj.Agent.Options)
+	}
+}
+
+func TestBuildAgentOptionsPreservesExplicitLanguage(t *testing.T) {
+	proj := config.ProjectConfig{
+		Name: "demo-project",
+		Agent: config.AgentConfig{
+			Options: map[string]any{"language": "en"},
+		},
+	}
+
+	got := buildAgentOptions("/tmp/data", proj, "zh")
+	if got["language"] != "en" {
+		t.Fatalf("language = %v, want explicit project value %q", got["language"], "en")
 	}
 }
 

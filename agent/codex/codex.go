@@ -43,6 +43,7 @@ type Agent struct {
 	codexHome       string
 	systemPrompt    string
 	appendPrompt    string
+	ccConnectPrompt string
 	cmd             string   // CLI binary name, default "codex"
 	cliExtraArgs    []string // extra args parsed from cmd after the binary
 	providers       []core.ProviderConfig
@@ -65,6 +66,8 @@ func New(opts map[string]any) (core.Agent, error) {
 	codexHome, _ := opts["codex_home"].(string)
 	systemPrompt, _ := opts["system_prompt"].(string)
 	appendPrompt, _ := opts["append_system_prompt"].(string)
+	languageRaw, _ := opts["language"].(string)
+	language := core.NormalizeLanguageString(languageRaw)
 	mode = normalizeMode(mode)
 	backend = normalizeBackend(backend)
 	appServerURL = normalizeAppServerURL(appServerURL)
@@ -102,6 +105,7 @@ func New(opts map[string]any) (core.Agent, error) {
 		codexHome:       strings.TrimSpace(codexHome),
 		systemPrompt:    strings.TrimSpace(systemPrompt),
 		appendPrompt:    strings.TrimSpace(appendPrompt),
+		ccConnectPrompt: core.AgentFileSendPromptForLang(language),
 		cmd:             cmd,
 		cliExtraArgs:    cliExtraArgs,
 		configEnv:       configEnv,
@@ -472,6 +476,7 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	codexHome := a.codexHome
 	systemPrompt := a.systemPrompt
 	appendPrompt := a.appendPrompt
+	ccConnectPrompt := a.ccConnectPrompt
 	cliBin := a.cmd
 	cliExtraArgs := a.cliExtraArgs
 	workDir := a.workDir
@@ -491,6 +496,7 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	}
 	provName, _, provWireAPI, provHeaders := a.activeProviderCodexConfig()
 	a.mu.Unlock()
+	appendPrompt = joinCodexPromptSections(ccConnectPrompt, appendPrompt)
 
 	if provName != "" {
 		if err := ensureCodexProviderConfig(codexHome, provName, baseURL, provWireAPI, provHeaders); err != nil {

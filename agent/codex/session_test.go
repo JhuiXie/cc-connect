@@ -586,6 +586,51 @@ func TestSend_PrependsProjectPromptOnFreshSession(t *testing.T) {
 	}
 }
 
+func TestStartSessionInjectsFileSendPromptOnFreshSession(t *testing.T) {
+	workDir := t.TempDir()
+	binDir := filepath.Join(workDir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+
+	stdinFile := filepath.Join(workDir, "stdin.txt")
+	script := "#!/bin/sh\n" +
+		"cat > \"$CODEX_STDIN_FILE\"\n" +
+		"printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"thread-file-send\"}'\n" +
+		"printf '%s\\n' '{\"type\":\"turn.completed\"}'\n"
+	powershellScript := `
+[IO.File]::WriteAllText($env:CODEX_STDIN_FILE, [Console]::In.ReadToEnd())
+[Console]::Out.WriteLine('{"type":"thread.started","thread_id":"thread-file-send"}')
+[Console]::Out.WriteLine('{"type":"turn.completed"}')
+`
+	writeFakeCodexScript(t, binDir, script, powershellScript)
+
+	t.Setenv("CODEX_STDIN_FILE", stdinFile)
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	a, err := New(map[string]any{
+		"work_dir": workDir,
+		"cmd":      "codex",
+		"language": "zh",
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	session, err := a.StartSession(context.Background(), "")
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	if err := session.Send("请把生成的文件发给我", "", nil, nil); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	waitForFileContains(t, stdinFile, "cc-connect send --file")
+	waitForFileContains(t, stdinFile, "CC_PROJECT")
+	waitForFileContains(t, stdinFile, "CC_SESSION_KEY")
+}
+
 func TestSend_HandlesLargeJSONLines(t *testing.T) {
 	workDir := t.TempDir()
 	binDir := filepath.Join(workDir, "bin")

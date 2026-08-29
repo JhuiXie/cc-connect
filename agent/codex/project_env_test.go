@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -16,7 +17,7 @@ func TestNew_ParsesProjectEnvFromOpts(t *testing.T) {
 	// to be installed on the test runner.
 	opts := map[string]any{
 		"work_dir": t.TempDir(),
-		"cmd": "go",
+		"cmd":      "go",
 		"env": map[string]string{
 			"HTTPS_PROXY": "http://127.0.0.1:10808",
 			"HTTP_PROXY":  "http://127.0.0.1:10808",
@@ -50,7 +51,7 @@ func TestNew_ParsesProjectEnvFromOpts(t *testing.T) {
 func TestNew_ParsesProjectEnvFromMapStringAny(t *testing.T) {
 	opts := map[string]any{
 		"work_dir": t.TempDir(),
-		"cmd": "go",
+		"cmd":      "go",
 		"env": map[string]any{
 			"OPENAI_BASE_URL": "https://api.example.com/v1",
 			"CUSTOM_FLAG":     "yes",
@@ -80,7 +81,7 @@ func TestNew_ParsesProjectEnvFromMapStringAny(t *testing.T) {
 func TestNew_NoEnvOpts(t *testing.T) {
 	opts := map[string]any{
 		"work_dir": t.TempDir(),
-		"cmd": "go",
+		"cmd":      "go",
 	}
 
 	a, err := New(opts)
@@ -119,5 +120,27 @@ func TestNew_ParsesProjectPromptsFromOpts(t *testing.T) {
 	}
 	if agent.appendPrompt != "Always use linear-bug-intake." {
 		t.Fatalf("appendPrompt = %q", agent.appendPrompt)
+	}
+}
+
+func TestNewAddsFileSendPrompt(t *testing.T) {
+	a, err := New(map[string]any{
+		"work_dir": t.TempDir(),
+		"cmd":      "go",
+		"language": "zh",
+	})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	agent := a.(*Agent)
+	if !strings.Contains(agent.ccConnectPrompt, "cc-connect send --file") {
+		t.Fatalf("ccConnectPrompt missing file-send command: %q", agent.ccConnectPrompt)
+	}
+	if !strings.Contains(agent.ccConnectPrompt, "CC_PROJECT") || !strings.Contains(agent.ccConnectPrompt, "CC_SESSION_KEY") {
+		t.Fatalf("ccConnectPrompt missing session environment guidance: %q", agent.ccConnectPrompt)
+	}
+	if !strings.Contains(agent.ccConnectPrompt, "WSL") {
+		t.Fatalf("ccConnectPrompt missing WSL guidance: %q", agent.ccConnectPrompt)
 	}
 }
