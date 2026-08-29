@@ -1127,6 +1127,11 @@ func TestCUJ_A3_ImageReachesAgent(t *testing.T) {
 	agent := &cujAgent{}
 	dir := t.TempDir()
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	t.Cleanup(func() {
+		if err := e.Stop(); err != nil {
+			t.Errorf("stop engine: %v", err)
+		}
+	})
 
 	msg := &Message{
 		SessionKey: "test:img", Platform: "test", MessageID: "img1",
@@ -1191,6 +1196,11 @@ func TestCUJ_A5_FileReachesAgent(t *testing.T) {
 	agent := &cujAgent{}
 	dir := t.TempDir()
 	e := NewEngine("test", agent, []Platform{plat}, dir+"/sessions.json", LangEnglish)
+	t.Cleanup(func() {
+		if err := e.Stop(); err != nil {
+			t.Errorf("stop engine: %v", err)
+		}
+	})
 
 	msg := &Message{
 		SessionKey: "test:file", Platform: "test", MessageID: "f1",
