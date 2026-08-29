@@ -108,6 +108,34 @@ func TestBuildExecArgs_IncludesModelProvider(t *testing.T) {
 	}
 }
 
+func TestBuildExecArgs_IncludesFastServiceTierFromCLIExtraArgs(t *testing.T) {
+	cs, err := newCodexSession(
+		context.Background(),
+		"codex",
+		[]string{"-c", `service_tier="fast"`},
+		"/tmp/project",
+		"gpt-5.6-sol",
+		"",
+		"full-auto",
+		"",
+		"",
+		nil,
+		"openai",
+		"",
+		"",
+	)
+	if err != nil {
+		t.Fatalf("newCodexSession: %v", err)
+	}
+
+	args := cs.buildExecArgs("hello", nil)
+	args = append(append([]string{}, cs.cliExtraArgs...), args...)
+
+	if !containsSequence(args, []string{"-c", `service_tier="fast"`, "exec"}) {
+		t.Fatalf("args missing fast service tier before exec subcommand: %v", args)
+	}
+}
+
 func TestBuildExecArgs_ResumeOmitsCdFlag(t *testing.T) {
 	cs, err := newCodexSession(context.Background(), "codex", nil, "/tmp/project", "", "", "full-auto", "thread-abc", "", nil, "", "", "")
 	if err != nil {

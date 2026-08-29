@@ -339,6 +339,14 @@ const (
 	MsgModelCardSwitched     MsgKey = "model_card_switched"
 	MsgModelCardSwitchFailed MsgKey = "model_card_switch_failed"
 	MsgModelNotSupported     MsgKey = "model_not_supported"
+	MsgFastNotSupported      MsgKey = "fast_not_supported"
+	MsgFastStatus            MsgKey = "fast_status"
+	MsgFastEnabled           MsgKey = "fast_enabled"
+	MsgFastDisabled          MsgKey = "fast_disabled"
+	MsgFastProviderRequired  MsgKey = "fast_provider_required"
+	MsgFastModelUnsupported  MsgKey = "fast_model_unsupported"
+	MsgFastAutoDisabled      MsgKey = "fast_auto_disabled"
+	MsgFastUsage             MsgKey = "fast_usage"
 	MsgReasoningCurrent      MsgKey = "reasoning_current"
 	MsgReasoningChanged      MsgKey = "reasoning_changed"
 	MsgReasoningNotSupported MsgKey = "reasoning_not_supported"
@@ -413,31 +421,31 @@ const (
 	MsgCronIDLabel               MsgKey = "cron_id_label"
 	MsgCronFailedSuffix          MsgKey = "cron_failed_suffix"
 
-	MsgTimerNotAvailable  MsgKey = "timer_not_available"
-	MsgTimerUsage         MsgKey = "timer_usage"
-	MsgTimerAddUsage      MsgKey = "timer_add_usage"
-	MsgTimerAdded         MsgKey = "timer_added"
-	MsgTimerAddedExec     MsgKey = "timer_added_exec"
-	MsgTimerAddExecUsage  MsgKey = "timer_addexec_usage"
-	MsgTimerEmpty         MsgKey = "timer_empty"
-	MsgTimerListTitle     MsgKey = "timer_list_title"
-	MsgTimerListFooter    MsgKey = "timer_list_footer"
-	MsgTimerDelUsage      MsgKey = "timer_del_usage"
-	MsgTimerMuteUsage     MsgKey = "timer_mute_usage"
-	MsgTimerDeleted       MsgKey = "timer_deleted"
-	MsgTimerNotFound      MsgKey = "timer_not_found"
-	MsgTimerMuted         MsgKey = "timer_muted"
-	MsgTimerUnmuted       MsgKey = "timer_unmuted"
-	MsgTimerCardHint      MsgKey = "timer_card_hint"
-	MsgTimerBtnMute       MsgKey = "timer_btn_mute"
-	MsgTimerBtnUnmute     MsgKey = "timer_btn_unmute"
-	MsgTimerBtnDelete     MsgKey = "timer_btn_delete"
-	MsgTimerIDLabel       MsgKey = "timer_id_label"
-	MsgTimerScheduledLabel MsgKey = "timer_scheduled_label"
-	MsgTimerFailedSuffix  MsgKey = "timer_failed_suffix"
-	MsgCommandsTagAgent          MsgKey = "commands_tag_agent"
-	MsgCommandsTagShell          MsgKey = "commands_tag_shell"
-	MsgUpgradeTimeoutSuffix      MsgKey = "upgrade_timeout_suffix"
+	MsgTimerNotAvailable    MsgKey = "timer_not_available"
+	MsgTimerUsage           MsgKey = "timer_usage"
+	MsgTimerAddUsage        MsgKey = "timer_add_usage"
+	MsgTimerAdded           MsgKey = "timer_added"
+	MsgTimerAddedExec       MsgKey = "timer_added_exec"
+	MsgTimerAddExecUsage    MsgKey = "timer_addexec_usage"
+	MsgTimerEmpty           MsgKey = "timer_empty"
+	MsgTimerListTitle       MsgKey = "timer_list_title"
+	MsgTimerListFooter      MsgKey = "timer_list_footer"
+	MsgTimerDelUsage        MsgKey = "timer_del_usage"
+	MsgTimerMuteUsage       MsgKey = "timer_mute_usage"
+	MsgTimerDeleted         MsgKey = "timer_deleted"
+	MsgTimerNotFound        MsgKey = "timer_not_found"
+	MsgTimerMuted           MsgKey = "timer_muted"
+	MsgTimerUnmuted         MsgKey = "timer_unmuted"
+	MsgTimerCardHint        MsgKey = "timer_card_hint"
+	MsgTimerBtnMute         MsgKey = "timer_btn_mute"
+	MsgTimerBtnUnmute       MsgKey = "timer_btn_unmute"
+	MsgTimerBtnDelete       MsgKey = "timer_btn_delete"
+	MsgTimerIDLabel         MsgKey = "timer_id_label"
+	MsgTimerScheduledLabel  MsgKey = "timer_scheduled_label"
+	MsgTimerFailedSuffix    MsgKey = "timer_failed_suffix"
+	MsgCommandsTagAgent     MsgKey = "commands_tag_agent"
+	MsgCommandsTagShell     MsgKey = "commands_tag_shell"
+	MsgUpgradeTimeoutSuffix MsgKey = "upgrade_timeout_suffix"
 
 	MsgCronScheduleLabel MsgKey = "cron_schedule_label"
 	MsgCronNextRunLabel  MsgKey = "cron_next_run_label"
@@ -595,6 +603,7 @@ const (
 	MsgBuiltinCmdMemory    MsgKey = "memory"
 	MsgBuiltinCmdAllow     MsgKey = "allow"
 	MsgBuiltinCmdModel     MsgKey = "model"
+	MsgBuiltinCmdFast      MsgKey = "fast"
 	MsgBuiltinCmdReasoning MsgKey = "reasoning"
 	MsgBuiltinCmdMode      MsgKey = "mode"
 	MsgBuiltinCmdLang      MsgKey = "lang"
@@ -688,8 +697,8 @@ const (
 	// send / cron / timer / relay tool documentation in their native
 	// language. Translation coverage is en + zh for this PR; additional
 	// languages fall back to en automatically.
-	MsgAgentSendToolPrompt MsgKey = "agent_send_tool_prompt"
-	MsgAgentCronToolPrompt MsgKey = "agent_cron_tool_prompt"
+	MsgAgentSendToolPrompt  MsgKey = "agent_send_tool_prompt"
+	MsgAgentCronToolPrompt  MsgKey = "agent_cron_tool_prompt"
 	MsgAgentTimerToolPrompt MsgKey = "agent_timer_tool_prompt"
 	MsgAgentRelayToolPrompt MsgKey = "agent_relay_tool_prompt"
 )
@@ -1049,6 +1058,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/memory [add|global|global add]\n  View/edit agent memory files\n\n" +
 			"/allow <tool>\n  Pre-allow a tool (next session)\n\n" +
 			"/model [switch <name>]\n  View/switch model\n\n" +
+			"/fast [on|off|status]\n  Toggle Codex native Fast mode\n\n" +
 			"/reasoning [level]\n  View/switch reasoning effort\n\n" +
 			"/mode [name]\n  View/switch permission mode\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  View/switch language\n\n" +
@@ -1093,6 +1103,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/memory [add|global|global add]\n  查看/编辑 Agent 记忆文件\n\n" +
 			"/allow <工具名>\n  预授权工具（下次会话生效）\n\n" +
 			"/model [switch <名称>]\n  查看/切换模型\n\n" +
+			"/fast [on|off|status]\n  开关 Codex 原生 Fast mode\n\n" +
 			"/reasoning [级别]\n  查看/切换推理强度\n\n" +
 			"/mode [名称]\n  查看/切换权限模式\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  查看/切换语言\n\n" +
@@ -1137,6 +1148,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/memory [add|global|global add]\n  查看/編輯 Agent 記憶檔案\n\n" +
 			"/allow <工具名>\n  預授權工具（下次會話生效）\n\n" +
 			"/model [switch <名稱>]\n  查看/切換模型\n\n" +
+			"/fast [on|off|status]\n  開關 Codex 原生 Fast mode\n\n" +
 			"/reasoning [級別]\n  查看/切換推理強度\n\n" +
 			"/mode [名稱]\n  查看/切換權限模式\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  查看/切換語言\n\n" +
@@ -1179,6 +1191,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/memory [add|global|global add]\n  エージェントメモリの表示/編集\n\n" +
 			"/allow <ツール名>\n  ツールを事前許可（次のセッションで有効）\n\n" +
 			"/model [switch <名前>]\n  モデルの表示/切り替え\n\n" +
+			"/fast [on|off|status]\n  Codex ネイティブ Fast mode を切り替え\n\n" +
 			"/reasoning [レベル]\n  推論レベルの表示/切り替え\n\n" +
 			"/mode [名前]\n  権限モードの表示/切り替え\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  言語の表示/切り替え\n\n" +
@@ -1221,6 +1234,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/memory [add|global|global add]\n  Ver/editar archivos de memoria del agente\n\n" +
 			"/allow <herramienta>\n  Pre-autorizar herramienta (próxima sesión)\n\n" +
 			"/model [switch <nombre>]\n  Ver/cambiar modelo\n\n" +
+			"/fast [on|off|status]\n  Activar o desactivar el modo Fast nativo de Codex\n\n" +
 			"/reasoning [nivel]\n  Ver/cambiar nivel de razonamiento\n\n" +
 			"/mode [nombre]\n  Ver/cambiar modo de permisos\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  Ver/cambiar idioma\n\n" +
@@ -1309,6 +1323,7 @@ var messages = map[MsgKey]map[Language]string{
 	MsgHelpAgentSection: {
 		LangEnglish: "**Agent Configuration**\n" +
 			"/model [switch <name>] — View/switch model\n" +
+			"/fast [on|off|status] — Toggle Codex native Fast mode\n" +
 			"/mode [name] — View/switch permission mode\n" +
 			"/provider [list|add|...] — Manage API providers\n" +
 			"/memory [add|global|...] — View/edit memory files\n" +
@@ -1316,6 +1331,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — View/switch language",
 		LangChinese: "**Agent 配置**\n" +
 			"/model [switch <名称>] — 查看/切换模型\n" +
+			"/fast [on|off|status] — 开关 Codex 原生 Fast mode\n" +
 			"/mode [名称] — 查看/切换权限模式\n" +
 			"/provider [list|add|...] — 管理 API Provider\n" +
 			"/memory [add|global|...] — 查看/编辑记忆文件\n" +
@@ -1323,6 +1339,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — 查看/切换语言",
 		LangTraditionalChinese: "**Agent 配置**\n" +
 			"/model [switch <名稱>] — 查看/切換模型\n" +
+			"/fast [on|off|status] — 開關 Codex 原生 Fast mode\n" +
 			"/mode [名稱] — 查看/切換權限模式\n" +
 			"/provider [list|add|...] — 管理 API Provider\n" +
 			"/memory [add|global|...] — 查看/編輯記憶檔案\n" +
@@ -1330,6 +1347,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — 查看/切換語言",
 		LangJapanese: "**エージェント設定**\n" +
 			"/model [switch <名前>] — モデルの表示/切り替え\n" +
+			"/fast [on|off|status] — Codex ネイティブ Fast mode を切り替え\n" +
 			"/mode [名前] — 権限モードの表示/切り替え\n" +
 			"/provider [list|add|...] — API プロバイダ管理\n" +
 			"/memory [add|global|...] — メモリの表示/編集\n" +
@@ -1337,6 +1355,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — 言語の表示/切り替え",
 		LangSpanish: "**Configuración del agente**\n" +
 			"/model [switch <nombre>] — Ver/cambiar modelo\n" +
+			"/fast [on|off|status] — Activar o desactivar el modo Fast nativo de Codex\n" +
 			"/mode [nombre] — Ver/cambiar modo de permisos\n" +
 			"/provider [list|add|...] — Gestionar proveedores\n" +
 			"/memory [add|global|...] — Ver/editar memoria\n" +
@@ -2302,6 +2321,62 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "當前 Agent 不支援模型切換。",
 		LangJapanese:           "このエージェントはモデルの切り替えをサポートしていません。",
 		LangSpanish:            "Este agente no soporta el cambio de modelo.",
+	},
+	MsgFastNotSupported: {
+		LangEnglish:            "This agent does not support native Fast mode.",
+		LangChinese:            "当前 Agent 不支持原生 Fast mode。",
+		LangTraditionalChinese: "當前 Agent 不支援原生 Fast mode。",
+		LangJapanese:           "このエージェントはネイティブ Fast mode をサポートしていません。",
+		LangSpanish:            "Este agente no admite el modo Fast nativo.",
+	},
+	MsgFastStatus: {
+		LangEnglish:            "Fast mode: **%s**\nProvider: `%s`\nModel: `%s`",
+		LangChinese:            "Fast mode：**%s**\nProvider：`%s`\n模型：`%s`",
+		LangTraditionalChinese: "Fast mode：**%s**\nProvider：`%s`\n模型：`%s`",
+		LangJapanese:           "Fast mode: **%s**\nProvider: `%s`\nモデル: `%s`",
+		LangSpanish:            "Modo Fast: **%s**\nProvider: `%s`\nModelo: `%s`",
+	},
+	MsgFastEnabled: {
+		LangEnglish:            "Fast mode enabled. The next turn will use Codex priority processing.",
+		LangChinese:            "Fast mode 已开启，下一轮将使用 Codex 优先处理。",
+		LangTraditionalChinese: "Fast mode 已開啟，下一輪將使用 Codex 優先處理。",
+		LangJapanese:           "Fast mode を有効にしました。次のターンから Codex の優先処理を使用します。",
+		LangSpanish:            "Modo Fast activado. El siguiente turno usará el procesamiento prioritario de Codex.",
+	},
+	MsgFastDisabled: {
+		LangEnglish:            "Fast mode disabled. The next turn will use standard processing.",
+		LangChinese:            "Fast mode 已关闭，下一轮将使用标准处理。",
+		LangTraditionalChinese: "Fast mode 已關閉，下一輪將使用標準處理。",
+		LangJapanese:           "Fast mode を無効にしました。次のターンから標準処理を使用します。",
+		LangSpanish:            "Modo Fast desactivado. El siguiente turno usará el procesamiento estándar.",
+	},
+	MsgFastProviderRequired: {
+		LangEnglish:            "Fast mode is only available for the Codex `openai` provider. Current provider: `%s`.",
+		LangChinese:            "Fast mode 仅支持 Codex 的 `openai` provider。当前 provider：`%s`。",
+		LangTraditionalChinese: "Fast mode 僅支援 Codex 的 `openai` provider。目前 provider：`%s`。",
+		LangJapanese:           "Fast mode は Codex の `openai` provider でのみ利用できます。現在: `%s`。",
+		LangSpanish:            "El modo Fast solo está disponible con el provider `openai` de Codex. Actual: `%s`.",
+	},
+	MsgFastModelUnsupported: {
+		LangEnglish:            "Model `%s` does not support Fast mode. Supported models: %s.",
+		LangChinese:            "模型 `%s` 不支持 Fast mode。支持的模型：%s。",
+		LangTraditionalChinese: "模型 `%s` 不支援 Fast mode。支援的模型：%s。",
+		LangJapanese:           "モデル `%s` は Fast mode をサポートしていません。対応モデル: %s。",
+		LangSpanish:            "El modelo `%s` no admite el modo Fast. Modelos compatibles: %s.",
+	},
+	MsgFastAutoDisabled: {
+		LangEnglish:            "Fast mode was automatically disabled because the selected provider or model is not supported.",
+		LangChinese:            "所选 provider 或模型不支持 Fast mode，已自动关闭。",
+		LangTraditionalChinese: "所選 provider 或模型不支援 Fast mode，已自動關閉。",
+		LangJapanese:           "選択した provider またはモデルが非対応のため、Fast mode を自動的に無効化しました。",
+		LangSpanish:            "El modo Fast se desactivó automáticamente porque el provider o modelo seleccionado no es compatible.",
+	},
+	MsgFastUsage: {
+		LangEnglish:            "Usage: `/fast on`, `/fast off`, or `/fast status`",
+		LangChinese:            "用法：`/fast on`、`/fast off` 或 `/fast status`",
+		LangTraditionalChinese: "用法：`/fast on`、`/fast off` 或 `/fast status`",
+		LangJapanese:           "使い方: `/fast on`、`/fast off`、`/fast status`",
+		LangSpanish:            "Uso: `/fast on`, `/fast off` o `/fast status`",
 	},
 	MsgReasoningCurrent: {
 		LangEnglish:            "Current reasoning effort: %s",
@@ -3682,6 +3757,13 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "查看/切換模型，參數: [名稱]",
 		LangJapanese:           "モデルの表示/切り替え、引数: [名前]",
 		LangSpanish:            "Ver/cambiar modelo, arg: [nombre]",
+	},
+	MsgBuiltinCmdFast: {
+		LangEnglish:            "Toggle Codex native Fast mode, arg: [on|off|status]",
+		LangChinese:            "开关 Codex 原生 Fast mode，参数: [on|off|status]",
+		LangTraditionalChinese: "開關 Codex 原生 Fast mode，參數: [on|off|status]",
+		LangJapanese:           "Codex ネイティブ Fast mode の切り替え、引数: [on|off|status]",
+		LangSpanish:            "Activar o desactivar el modo Fast nativo de Codex, arg: [on|off|status]",
 	},
 	MsgBuiltinCmdReasoning: {
 		LangEnglish:            "View/switch reasoning effort, arg: [level]",

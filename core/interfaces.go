@@ -443,6 +443,24 @@ type ReasoningEffortSwitcher interface {
 	AvailableReasoningEfforts() []string
 }
 
+// FastModeStatus describes whether an agent can use its native fast inference
+// mode with the currently selected provider and model.
+type FastModeStatus struct {
+	Enabled         bool
+	Available       bool
+	Provider        string
+	Model           string
+	SupportedModels []string
+}
+
+// FastModeSwitcher is an optional interface for agents that support native
+// fast inference routing. Changes take effect when the current agent process is
+// recreated; the engine preserves the backend session ID when doing so.
+type FastModeSwitcher interface {
+	SetFastMode(enabled bool)
+	FastModeStatus() FastModeStatus
+}
+
 // ModelOption describes a selectable model.
 type ModelOption struct {
 	Name  string // model identifier passed to CLI

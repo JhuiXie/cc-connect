@@ -6503,6 +6503,7 @@ var builtinCommands = []struct {
 	{[]string{"history"}, "history"},
 	{[]string{"allow"}, "allow"},
 	{[]string{"model"}, "model"},
+	{[]string{"fast"}, "fast"},
 	{[]string{"reasoning", "effort"}, "reasoning"},
 	{[]string{"mode"}, "mode"},
 	{[]string{"lang"}, "lang"},
@@ -6712,6 +6713,8 @@ func (e *Engine) handleCommand(p Platform, msg *Message, raw string) bool {
 		e.cmdAllow(p, msg, args)
 	case "model":
 		e.cmdModel(p, msg, args)
+	case "fast":
+		e.cmdFast(p, msg, args)
 	case "reasoning":
 		e.cmdReasoning(p, msg, args)
 	case "mode":
@@ -9559,6 +9562,7 @@ func helpCardGroups() []helpCardGroup {
 			titleKey: MsgHelpAgentSection,
 			items: []helpCardItem{
 				{command: "/model", action: "nav:/model"},
+				{command: "/fast", action: "cmd:/fast status"},
 				{command: "/reasoning", action: "nav:/reasoning"},
 				{command: "/mode", action: "nav:/mode"},
 				{command: "/lang", action: "nav:/lang"},
@@ -9911,7 +9915,100 @@ func (e *Engine) cmdModel(p Platform, msg *Message, args []string) {
 	// natively without replaying history (no extra token cost).
 	sessions.Save()
 
-	e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgModelChanged, target))
+	reply := e.i18n.Tf(MsgModelChanged, target)
+	if e.disableUnavailableFastMode(agent) {
+		reply += "\n\n" + e.i18n.T(MsgFastAutoDisabled)
+	}
+	e.reply(p, msg.ReplyCtx, reply)
+}
+
+func (e *Engine) cmdFast(p Platform, msg *Message, args []string) {
+	agent, _, interactiveKey, err := e.commandContext(p, msg)
+	if err != nil {
+		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgWsResolutionError, err))
+		return
+	}
+
+	switcher, ok := agent.(FastModeSwitcher)
+	if !ok {
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgFastNotSupported))
+		return
+	}
+
+	status := switcher.FastModeStatus()
+	sub := "status"
+	if len(args) > 0 {
+		sub = matchSubCommand(strings.ToLower(args[0]), []string{"on", "off", "status"})
+	}
+	if len(args) > 1 {
+		sub = ""
+	}
+
+	switch sub {
+	case "status":
+		provider := status.Provider
+		if provider == "" {
+			provider = "none"
+		}
+		model := status.Model
+		if model == "" {
+			model = "default"
+		}
+		state := e.i18n.T(MsgDisabledShort)
+		if status.Enabled {
+			state = e.i18n.T(MsgEnabledShort)
+		}
+		reply := e.i18n.Tf(MsgFastStatus, state, provider, model)
+		if status.Provider != "openai" {
+			reply += "\n\n" + e.i18n.Tf(MsgFastProviderRequired, provider)
+		} else if !status.Available {
+			reply += "\n\n" + e.i18n.Tf(MsgFastModelUnsupported, model, formatFastModeModels(status.SupportedModels))
+		}
+		e.reply(p, msg.ReplyCtx, reply)
+	case "on":
+		if status.Provider != "openai" {
+			provider := status.Provider
+			if provider == "" {
+				provider = "none"
+			}
+			e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgFastProviderRequired, provider))
+			return
+		}
+		if !status.Available {
+			e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgFastModelUnsupported, status.Model, formatFastModeModels(status.SupportedModels)))
+			return
+		}
+		switcher.SetFastMode(true)
+		e.cleanupInteractiveState(interactiveKey)
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgFastEnabled))
+	case "off":
+		switcher.SetFastMode(false)
+		e.cleanupInteractiveState(interactiveKey)
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgFastDisabled))
+	default:
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgFastUsage))
+	}
+}
+
+func formatFastModeModels(models []string) string {
+	quoted := make([]string, 0, len(models))
+	for _, model := range models {
+		quoted = append(quoted, "`"+model+"`")
+	}
+	return strings.Join(quoted, ", ")
+}
+
+func (e *Engine) disableUnavailableFastMode(agent Agent) bool {
+	switcher, ok := agent.(FastModeSwitcher)
+	if !ok {
+		return false
+	}
+	status := switcher.FastModeStatus()
+	if !status.Enabled || status.Available {
+		return false
+	}
+	switcher.SetFastMode(false)
+	return true
 }
 
 // resolveModelAlias resolves a user-supplied string to a model name.
@@ -10997,7 +11094,11 @@ func (e *Engine) switchProvider(p Platform, msg *Message, sessions *SessionManag
 		}
 	}
 
-	e.reply(p, msg.ReplyCtx, fmt.Sprintf(e.i18n.T(MsgProviderSwitched), name))
+	reply := fmt.Sprintf(e.i18n.T(MsgProviderSwitched), name)
+	if agent, ok := switcher.(Agent); ok && e.disableUnavailableFastMode(agent) {
+		reply += "\n\n" + e.i18n.T(MsgFastAutoDisabled)
+	}
+	e.reply(p, msg.ReplyCtx, reply)
 }
 
 // handlePendingProviderAdd checks for a pending provider add state (from the
@@ -12296,8 +12397,12 @@ func (e *Engine) handleModelCardAction(args, sessionKey string) *Card {
 	if err == nil {
 		sessions.Save()
 	}
+	warning := ""
+	if err == nil && e.disableUnavailableFastMode(agent) {
+		warning = e.i18n.T(MsgFastAutoDisabled)
+	}
 
-	return e.renderModelSwitchResultCard(resolved, err)
+	return e.renderModelSwitchResultCard(resolved, err, warning)
 }
 
 func (e *Engine) persistWorkspaceModelOverride(interactiveKey, sessionKey string, agent Agent, model string) {
@@ -12900,13 +13005,17 @@ func (e *Engine) pushDeleteModeResultCard(sessionKey string) {
 
 func (e *Engine) performModelSwitchAsync(sessionKey string, state *interactiveState, agent Agent, sessions *SessionManager, target string) {
 	resolved, err := e.switchModelOnAgent(agent, target, agent == e.agent)
+	warning := ""
 	if err == nil {
 		interactiveKey := e.interactiveKeyForSessionKey(sessionKey)
 		e.persistWorkspaceModelOverride(interactiveKey, sessionKey, agent, resolved)
 		sessions.Save()
+		if e.disableUnavailableFastMode(agent) {
+			warning = e.i18n.T(MsgFastAutoDisabled)
+		}
 	}
 
-	resultCard := e.renderModelSwitchResultCard(resolved, err)
+	resultCard := e.renderModelSwitchResultCard(resolved, err, warning)
 	if state != nil {
 		state.mu.Lock()
 		if state.modelSwitch != nil {
@@ -12916,6 +13025,9 @@ func (e *Engine) performModelSwitchAsync(sessionKey string, state *interactiveSt
 				state.modelSwitch.result = e.i18n.Tf(MsgModelCardSwitchFailed, err)
 			} else {
 				state.modelSwitch.result = e.i18n.Tf(MsgModelCardSwitched, resolved)
+				if warning != "" {
+					state.modelSwitch.result += "\n\n" + warning
+				}
 			}
 		}
 		state.mu.Unlock()
@@ -13182,7 +13294,7 @@ func (e *Engine) renderModelSwitchingCard(target string) *Card {
 		Build()
 }
 
-func (e *Engine) renderModelSwitchResultCard(target string, err error) *Card {
+func (e *Engine) renderModelSwitchResultCard(target string, err error, warnings ...string) *Card {
 	if err != nil {
 		return NewCard().
 			Title(e.i18n.T(MsgCardTitleModel), "red").
@@ -13190,9 +13302,13 @@ func (e *Engine) renderModelSwitchResultCard(target string, err error) *Card {
 			Buttons(e.modelCardBackButton()).
 			Build()
 	}
+	message := e.i18n.Tf(MsgModelCardSwitched, target)
+	if len(warnings) > 0 && warnings[0] != "" {
+		message += "\n\n" + warnings[0]
+	}
 	return NewCard().
 		Title(e.i18n.T(MsgCardTitleModel), "green").
-		Markdown(e.i18n.Tf(MsgModelCardSwitched, target)).
+		Markdown(message).
 		Buttons(e.modelCardBackButton()).
 		Build()
 }

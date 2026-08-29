@@ -145,6 +145,7 @@ type appServerSession struct {
 	workDir        string
 	model          string
 	effort         string
+	serviceTier    string
 	mode           string
 	baseURL        string
 	modelProvider  string
@@ -191,13 +192,18 @@ const (
 	appServerUsageRefreshTimeout = 1500 * time.Millisecond
 )
 
-func newAppServerSession(ctx context.Context, url, workDir, model, effort, mode, resumeID, baseURL, modelProvider string, extraEnv []string, codexHome string, systemPrompt string, appendPrompt string) (*appServerSession, error) {
+func newAppServerSession(ctx context.Context, url, workDir, model, effort, mode, resumeID, baseURL, modelProvider string, extraEnv []string, codexHome string, systemPrompt string, appendPrompt string, serviceTier ...string) (*appServerSession, error) {
 	sessionCtx, cancel := context.WithCancel(ctx)
+	tier := ""
+	if len(serviceTier) > 0 {
+		tier = strings.TrimSpace(serviceTier[0])
+	}
 	s := &appServerSession{
 		url:              url,
 		workDir:          workDir,
 		model:            model,
 		effort:           effort,
+		serviceTier:      tier,
 		mode:             mode,
 		baseURL:          baseURL,
 		modelProvider:    modelProvider,
@@ -244,6 +250,9 @@ func (s *appServerSession) connect() error {
 	}
 	if effort := strings.TrimSpace(s.effort); effort != "" {
 		args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", effort))
+	}
+	if serviceTier := strings.TrimSpace(s.serviceTier); serviceTier != "" {
+		args = append(args, "-c", fmt.Sprintf("service_tier=%q", serviceTier))
 	}
 	if provider := strings.TrimSpace(s.modelProvider); provider != "" {
 		args = append(args, "-c", fmt.Sprintf("model_provider=%q", provider))

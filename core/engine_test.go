@@ -455,6 +455,33 @@ type stubStrictModelAgent struct {
 	calls  int
 }
 
+type stubFastModeAgent struct {
+	stubModelModeAgent
+	fastEnabled      bool
+	fastModels       []string
+	fastSetCalls     []bool
+	fastAvailability bool
+}
+
+func (a *stubFastModeAgent) SetFastMode(enabled bool) {
+	a.fastEnabled = enabled
+	a.fastSetCalls = append(a.fastSetCalls, enabled)
+}
+
+func (a *stubFastModeAgent) FastModeStatus() FastModeStatus {
+	provider := ""
+	if active := a.GetActiveProvider(); active != nil {
+		provider = active.Name
+	}
+	return FastModeStatus{
+		Enabled:         a.fastEnabled,
+		Available:       a.fastAvailability,
+		Provider:        provider,
+		Model:           a.GetModel(),
+		SupportedModels: append([]string(nil), a.fastModels...),
+	}
+}
+
 type stubLiveModeSession struct {
 	stubAgentSession
 	modes []string
@@ -4526,6 +4553,111 @@ func TestCmdModel_UsesInlineButtonsOnButtonOnlyPlatform(t *testing.T) {
 	}
 	if got := p.buttonRows[0][0].Data; got != "cmd:/model switch 1" {
 		t.Fatalf("first /model button = %q, want %q", got, "cmd:/model switch 1")
+	}
+}
+
+func TestCmdFast_OnEnablesSupportedOpenAIModel(t *testing.T) {
+	p := &stubPlatformEngine{n: "plain"}
+	agent := &stubFastModeAgent{
+		stubModelModeAgent: stubModelModeAgent{
+			model:     "gpt-5.6-sol",
+			providers: []ProviderConfig{{Name: "openai", Model: "gpt-5.6-sol"}},
+			active:    "openai",
+		},
+		fastModels:       []string{"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+		fastAvailability: true,
+	}
+	e := NewEngine("test", agent, []Platform{p}, "", LangEnglish)
+
+	e.handleCommand(p, &Message{SessionKey: "test:user1", ReplyCtx: "ctx"}, "/fast on")
+
+	if !agent.fastEnabled {
+		t.Fatal("fast mode = false, want true")
+	}
+	if len(agent.fastSetCalls) != 1 || !agent.fastSetCalls[0] {
+		t.Fatalf("SetFastMode calls = %v, want [true]", agent.fastSetCalls)
+	}
+	if got := p.getSent(); len(got) != 1 || !strings.Contains(got[0], "Fast mode enabled") {
+		t.Fatalf("reply = %v, want enabled confirmation", got)
+	}
+}
+
+func TestCmdFast_OnRejectsNonOpenAIProvider(t *testing.T) {
+	p := &stubPlatformEngine{n: "plain"}
+	agent := &stubFastModeAgent{
+		stubModelModeAgent: stubModelModeAgent{
+			model:     "gpt-5.6-sol",
+			providers: []ProviderConfig{{Name: "openrouter", Model: "gpt-5.6-sol"}},
+			active:    "openrouter",
+		},
+		fastModels: []string{"gpt-5.6-sol"},
+	}
+	e := NewEngine("test", agent, []Platform{p}, "", LangEnglish)
+
+	e.handleCommand(p, &Message{SessionKey: "test:user1", ReplyCtx: "ctx"}, "/fast on")
+
+	if agent.fastEnabled {
+		t.Fatal("fast mode = true, want false")
+	}
+	if len(agent.fastSetCalls) != 0 {
+		t.Fatalf("SetFastMode calls = %v, want none", agent.fastSetCalls)
+	}
+	if got := p.getSent(); len(got) != 1 || !strings.Contains(got[0], "only available") {
+		t.Fatalf("reply = %v, want provider rejection", got)
+	}
+}
+
+func TestCmdFast_OnRejectsUnsupportedModel(t *testing.T) {
+	p := &stubPlatformEngine{n: "plain"}
+	agent := &stubFastModeAgent{
+		stubModelModeAgent: stubModelModeAgent{
+			model:     "gpt-5.4",
+			providers: []ProviderConfig{{Name: "openai", Model: "gpt-5.4"}},
+			active:    "openai",
+		},
+		fastModels: []string{"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+	}
+	e := NewEngine("test", agent, []Platform{p}, "", LangEnglish)
+
+	e.handleCommand(p, &Message{SessionKey: "test:user1", ReplyCtx: "ctx"}, "/fast on")
+
+	if agent.fastEnabled {
+		t.Fatal("fast mode = true, want false")
+	}
+	if got := p.getSent(); len(got) != 1 || !strings.Contains(got[0], "does not support Fast mode") || !strings.Contains(got[0], "gpt-5.6-sol") {
+		t.Fatalf("reply = %v, want unsupported-model warning and supported list", got)
+	}
+}
+
+func TestCmdModel_DisablesFastModeForUnsupportedSelection(t *testing.T) {
+	p := &stubPlatformEngine{n: "plain"}
+	agent := &stubFastModeAgent{
+		stubModelModeAgent: stubModelModeAgent{
+			model: "gpt-5.6-sol",
+			providers: []ProviderConfig{{
+				Name:  "openai",
+				Model: "gpt-5.6-sol",
+				Models: []ModelOption{
+					{Name: "gpt-5.6-sol", Alias: "sol"},
+					{Name: "gpt-5.4", Alias: "legacy"},
+				},
+			}},
+			active: "openai",
+		},
+		fastEnabled:      true,
+		fastModels:       []string{"gpt-5.6-sol"},
+		fastAvailability: false,
+	}
+	e := NewEngine("test", agent, []Platform{p}, "", LangEnglish)
+	e.SetProviderModelSaveFunc(func(string, string) error { return nil })
+
+	e.cmdModel(p, &Message{SessionKey: "test:user1", ReplyCtx: "ctx"}, []string{"switch", "legacy"})
+
+	if agent.fastEnabled {
+		t.Fatal("fast mode = true, want false after unsupported model switch")
+	}
+	if got := p.getSent(); len(got) != 1 || !strings.Contains(got[0], "automatically disabled") {
+		t.Fatalf("reply = %v, want automatic-disable warning", got)
 	}
 }
 

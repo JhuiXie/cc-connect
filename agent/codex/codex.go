@@ -37,6 +37,7 @@ type Agent struct {
 	workDir         string
 	model           string
 	reasoningEffort string
+	fastMode        bool
 	mode            string // "suggest" | "auto-edit" | "full-auto" | "yolo"
 	backend         string // "exec" | "app_server"
 	appServerURL    string
@@ -208,6 +209,47 @@ func (a *Agent) GetReasoningEffort() string {
 
 func (a *Agent) AvailableReasoningEfforts() []string {
 	return []string{"low", "medium", "high", "xhigh", "max"}
+}
+
+var fastModeModels = []string{
+	"gpt-5.6-luna",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+}
+
+func supportsFastModeModel(model string) bool {
+	for _, supported := range fastModeModels {
+		if model == supported {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Agent) SetFastMode(enabled bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.fastMode = enabled
+	slog.Info("codex: fast mode changed", "enabled", enabled)
+}
+
+func (a *Agent) FastModeStatus() core.FastModeStatus {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	provider := ""
+	if a.activeIdx >= 0 && a.activeIdx < len(a.providers) {
+		provider = a.providers[a.activeIdx].Name
+	}
+	model := core.GetProviderModel(a.providers, a.activeIdx, a.model)
+
+	return core.FastModeStatus{
+		Enabled:         a.fastMode,
+		Available:       provider == "openai" && supportsFastModeModel(model),
+		Provider:        provider,
+		Model:           model,
+		SupportedModels: append([]string(nil), fastModeModels...),
+	}
 }
 
 func (a *Agent) configuredModels() []core.ModelOption {
@@ -471,6 +513,7 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	mode := a.mode
 	model := a.model
 	reasoningEffort := a.reasoningEffort
+	fastMode := a.fastMode
 	backend := a.backend
 	appServerURL := a.appServerURL
 	codexHome := a.codexHome
@@ -497,6 +540,13 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	provName, _, provWireAPI, provHeaders := a.activeProviderCodexConfig()
 	a.mu.Unlock()
 	appendPrompt = joinCodexPromptSections(ccConnectPrompt, appendPrompt)
+	serviceTier := ""
+	if provName == "openai" {
+		serviceTier = "default"
+		if fastMode && supportsFastModeModel(model) {
+			serviceTier = "fast"
+		}
+	}
 
 	if provName != "" {
 		if err := ensureCodexProviderConfig(codexHome, provName, baseURL, provWireAPI, provHeaders); err != nil {
@@ -505,7 +555,10 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	}
 
 	if backend == "app_server" {
-		return newAppServerSession(ctx, appServerURL, workDir, model, reasoningEffort, mode, sessionID, baseURL, provName, extraEnv, codexHome, systemPrompt, appendPrompt)
+		return newAppServerSession(ctx, appServerURL, workDir, model, reasoningEffort, mode, sessionID, baseURL, provName, extraEnv, codexHome, systemPrompt, appendPrompt, serviceTier)
+	}
+	if serviceTier != "" {
+		cliExtraArgs = append(append([]string(nil), cliExtraArgs...), "-c", fmt.Sprintf("service_tier=%q", serviceTier))
 	}
 	if codexHome != "" {
 		extraEnv = append(extraEnv, "CODEX_HOME="+codexHome)
