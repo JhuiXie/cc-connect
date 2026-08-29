@@ -7393,7 +7393,7 @@ func (e *Engine) buildReplyFooter(agent Agent, session AgentSession, workspaceDi
 // RichCardSupporter.BuildRichCard. Layout (skipping any empty line):
 //
 //	line 1: ⏱ <i18n elapsed>                                  (subject to e.replyFooterEnabled)
-//	line 2: model · out N · in N cw N cr N · ctx N% · quota    (subject to e.showContextIndicator)
+//	line 2: model · effort · out N · in N · ctx N% · quota      (subject to e.showContextIndicator)
 //	line 3: <workdir>                                         (subject to e.showWorkdirIndicator)
 //
 // Returns "" when the master replyFooterEnabled toggle is off, or while the
@@ -7448,12 +7448,12 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 
 // buildClaudeStatusLineFooter renders the rich-card line-2 token-usage detail:
 //
-//	claude-opus-4-7[1m] · xhigh · out 168 · in 1 cw 971 cr 40.8k · ctx 4%
+//	claude-opus-4-7[1m] · xhigh · out 168 · in 1 · ctx 4%
 //
 // Sections (each skipped when its data is missing):
 //   - model: from session GetModel() / agent.Name()
 //   - effort: reasoning_effort (Codex / Claude high/medium/low/xhigh/max)
-//   - token counts: out (output) · in (new input) · cw (cache create) · cr (cache read)
+//   - token counts: out (output) · in (new input)
 //   - ctx %: UsedTokens / ContextWindow, capped at 100%
 //
 // Returns "" when usage is nil and no model is known.
@@ -7472,12 +7472,6 @@ func buildClaudeStatusLineFooter(model, effort string, usage *ContextUsage) stri
 		}
 		if usage.InputTokens > 0 {
 			counts = append(counts, fmt.Sprintf("in %s", formatStatusTokenCount(usage.InputTokens)))
-		}
-		if usage.CacheCreationInputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("cw %s", formatStatusTokenCount(usage.CacheCreationInputTokens)))
-		}
-		if usage.CachedInputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("cr %s", formatStatusTokenCount(usage.CachedInputTokens)))
 		}
 		if len(counts) > 0 {
 			parts = append(parts, strings.Join(counts, " "))
@@ -7833,7 +7827,7 @@ func replyFooterHomeRelativePath(path, home string) (string, bool) {
 // buildClaudeStatusLineFooter renders a CCD-statusline-style footer for the
 // reply, composed of two lines:
 //
-//	line 1 (controlled by show_context_indicator): <model id> · [effort:X ·] out N · in N cw N cr N · ctx N%
+//	line 1 (controlled by show_context_indicator): <model id> · [effort:X ·] out N · in N · ctx N% · quota
 //	line 2 (controlled by show_workdir_indicator): <workspace dir>
 //
 // Returns "" if reply_footer is disabled, or if the active session does not
@@ -7869,9 +7863,7 @@ func (e *Engine) buildClaudeStatusLineFooter(agent Agent, session AgentSession, 
 		}
 
 		// Compose:
-		//   <model id> · [effort:X ·] out N · in N cw N cr N · ctx N%
-		// `·` separates major segments; tokens-in tier (in/cw/cr) groups under
-		// one segment because cw/cr are just cache-tiered variants of input.
+		//   <model id> · [effort:X ·] out N · in N · ctx N%
 		// Raw model id is preserved (e.g. "claude-opus-4-7[1m]") for diagnostic
 		// clarity over a prettified display name.
 		var line1Parts []string
@@ -7882,11 +7874,11 @@ func (e *Engine) buildClaudeStatusLineFooter(agent Agent, session AgentSession, 
 			line1Parts = append(line1Parts, "effort:"+effort)
 		}
 		line1Parts = append(line1Parts, fmt.Sprintf("out %s", formatStatusTokenCount(usage.OutputTokens)))
-		line1Parts = append(line1Parts, fmt.Sprintf("in %s cw %s cr %s",
-			formatStatusTokenCount(usage.InputTokens),
-			formatStatusTokenCount(usage.CacheCreationInputTokens),
-			formatStatusTokenCount(usage.CachedInputTokens)))
+		line1Parts = append(line1Parts, fmt.Sprintf("in %s", formatStatusTokenCount(usage.InputTokens)))
 		line1Parts = append(line1Parts, fmt.Sprintf("ctx %d%%", pct))
+		if quota := e.replyFooterUsageText(session, agent); quota != "" {
+			line1Parts = append(line1Parts, quota)
+		}
 		line1 = strings.Join(line1Parts, " · ")
 	}
 

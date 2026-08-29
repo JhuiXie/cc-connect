@@ -162,8 +162,8 @@ func TestBuildClaudeStatusLineFooter_FullRender(t *testing.T) {
 	if parts[1] != "out 168" {
 		t.Errorf("out segment = %q, want %q", parts[1], "out 168")
 	}
-	if parts[2] != "in 1 cw 971 cr 40.8k" {
-		t.Errorf("in/cw/cr segment = %q, want %q", parts[2], "in 1 cw 971 cr 40.8k")
+	if parts[2] != "in 1" {
+		t.Errorf("in segment = %q, want %q", parts[2], "in 1")
 	}
 	if parts[3] != "ctx 4%" {
 		t.Errorf("ctx segment = %q, want %q", parts[3], "ctx 4%")
