@@ -2,7 +2,6 @@ package codex
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -236,23 +235,6 @@ func TestIntegration_Codex_ProviderConfig_WrittenCorrectly(t *testing.T) {
 			}
 			if !strings.Contains(cfgContent, prov.BaseURL) {
 				t.Errorf("config.toml missing base_url %s", prov.BaseURL)
-			}
-
-			err = ensureCodexAuth(home, prov.APIKey)
-			if err != nil {
-				t.Fatalf("ensureCodexAuth failed: %v", err)
-			}
-
-			authData, err := os.ReadFile(filepath.Join(home, "auth.json"))
-			if err != nil {
-				t.Fatalf("read auth.json: %v", err)
-			}
-			var authMap map[string]any
-			if err := json.Unmarshal(authData, &authMap); err != nil {
-				t.Fatalf("parse auth.json: %v", err)
-			}
-			if authMap["OPENAI_API_KEY"] != prov.APIKey {
-				t.Error("OPENAI_API_KEY not written correctly to auth.json")
 			}
 
 			t.Logf("provider config written OK: name=%s wireAPI=%s", prov.Name, prov.CodexWireAPI)

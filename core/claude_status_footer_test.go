@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newClaudeFooterEngine returns an Engine with all three footer-related flags
@@ -31,6 +32,69 @@ func TestFormatStatusTokenCount(t *testing.T) {
 		got := formatStatusTokenCount(in)
 		if got != want {
 			t.Errorf("formatStatusTokenCount(%d) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestFormatReplyFooterUsage_RendersPrimaryAndWeeklyQuota(t *testing.T) {
+	e := NewEngine("test", &stubAgent{}, nil, "", LangEnglish)
+	report := &UsageReport{
+		Buckets: []UsageBucket{{
+			Windows: []UsageWindow{
+				{UsedPercent: 10, WindowSeconds: 18000},
+				{UsedPercent: 22, WindowSeconds: 604800},
+			},
+		}},
+	}
+
+	got := formatReplyFooterUsage(report, e.i18n)
+	want := "5h 90% left · weekly 78% left"
+	if got != want {
+		t.Fatalf("formatReplyFooterUsage() = %q, want %q", got, want)
+	}
+}
+
+func TestComposeRichStatusFooter_AppendsAccountQuotaWithContextUsage(t *testing.T) {
+	workDir := "/tmp/ws"
+	agent := &stubReplyFooterAgent{
+		stubModelModeAgent: stubModelModeAgent{
+			model:           "gpt-5.6-luna",
+			reasoningEffort: "xhigh",
+		},
+		workDir: workDir,
+	}
+	e := NewEngine("test", agent, nil, "", LangEnglish)
+	e.SetReplyFooterEnabled(true)
+	e.SetShowContextIndicator(true)
+	e.SetShowWorkdirIndicator(true)
+
+	session := newControllableSession("s-rich-footer")
+	session.model = "gpt-5.6-luna"
+	session.reasoningEffort = "xhigh"
+	session.workDir = workDir
+	session.contextUsage = &ContextUsage{
+		InputTokens:   200,
+		OutputTokens:  100,
+		UsedTokens:    300,
+		ContextWindow: 1000,
+	}
+	session.report = &UsageReport{
+		Buckets: []UsageBucket{{
+			Windows: []UsageWindow{
+				{UsedPercent: 10, WindowSeconds: 18000},
+				{UsedPercent: 22, WindowSeconds: 604800},
+			},
+		}},
+	}
+
+	got := e.composeRichStatusFooter(false, time.Now().Add(-time.Second), agent, session, workDir)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("rich footer lines = %d, want 3: %q", len(lines), got)
+	}
+	for _, want := range []string{"5h 90% left", "weekly 78% left"} {
+		if !strings.Contains(lines[1], want) {
+			t.Errorf("rich footer line = %q, missing %q", lines[1], want)
 		}
 	}
 }

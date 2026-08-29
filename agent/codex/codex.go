@@ -353,7 +353,6 @@ func readCodexCachedModels() []core.ModelOption {
 	return parseCodexModelsJSON(b)
 }
 
-
 // parseCodexModelsJSON parses a Codex models JSON file (model_catalog.json
 // or models_cache.json) into a deduplicated, filtered slice of ModelOption.
 // It is shared by readCodexCachedModels and readCodexModelCatalog.
@@ -398,7 +397,6 @@ func parseCodexModelsJSON(data []byte) []core.ModelOption {
 	}
 	return models
 }
-
 
 // readCodexModelCatalog reads $CODEX_HOME/config.toml to find the
 // model_catalog_json setting, then reads and parses that JSON file.
@@ -488,15 +486,12 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 		}
 		baseURL = a.providers[a.activeIdx].BaseURL
 	}
-	provName, provAPIKey, provWireAPI, provHeaders := a.activeProviderCodexConfig()
+	provName, _, provWireAPI, provHeaders := a.activeProviderCodexConfig()
 	a.mu.Unlock()
 
 	if provName != "" {
 		if err := ensureCodexProviderConfig(codexHome, provName, baseURL, provWireAPI, provHeaders); err != nil {
 			slog.Warn("codex: failed to write provider config", "provider", provName, "error", err)
-		}
-		if err := ensureCodexAuth(codexHome, provAPIKey); err != nil {
-			slog.Warn("codex: failed to write auth.json", "provider", provName, "error", err)
 		}
 	}
 

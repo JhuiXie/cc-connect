@@ -1,7 +1,6 @@
 package codex
 
 import (
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,8 +10,7 @@ import (
 
 // TestIntegration_CodexProviderFlow verifies the full provider config flow:
 // 1. ensureCodexProviderConfig writes correct config.toml
-// 2. ensureCodexAuth writes correct auth.json
-// 3. Codex CLI can authenticate and respond using the written config
+// 2. Codex CLI can authenticate and respond using the written config
 //
 // Requires: SHENGSUANYUN_API_KEY env var and `codex` CLI in PATH.
 // Skip with: go test ./agent/codex/ -run TestIntegration -v
@@ -53,29 +51,7 @@ func TestIntegration_CodexProviderFlow(t *testing.T) {
 		}
 	}
 
-	// Step 2: write auth.json via our function
-	err = ensureCodexAuth(home, apiKey)
-	if err != nil {
-		t.Fatalf("ensureCodexAuth: %v", err)
-	}
-
-	// Verify auth.json content
-	authData, err := os.ReadFile(filepath.Join(home, "auth.json"))
-	if err != nil {
-		t.Fatalf("read auth.json: %v", err)
-	}
-	var authMap map[string]any
-	if err := json.Unmarshal(authData, &authMap); err != nil {
-		t.Fatalf("parse auth.json: %v", err)
-	}
-	if authMap["auth_mode"] != "apikey" {
-		t.Errorf("auth_mode = %v, want apikey", authMap["auth_mode"])
-	}
-	if authMap["OPENAI_API_KEY"] != apiKey {
-		t.Errorf("OPENAI_API_KEY not set correctly in auth.json")
-	}
-
-	// Step 3: run codex exec with the generated config
+	// Step 2: run codex exec with the generated config
 	workDir := filepath.Join(t.TempDir(), "repo")
 	os.MkdirAll(workDir, 0o755)
 	gitInit := exec.Command("git", "init", "-q")

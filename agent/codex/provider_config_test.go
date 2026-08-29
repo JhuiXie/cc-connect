@@ -1,10 +1,13 @@
 package codex
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/chenhg5/cc-connect/core"
 )
 
 func TestEnsureCodexProviderConfig_CreatesNewFile(t *testing.T) {
@@ -152,64 +155,42 @@ func TestEnsureCodexProviderConfig_SkipsWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestEnsureCodexAuth_WritesAuthJSON(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".codex")
-
-	err := ensureCodexAuth(home, "sk-test-key-123")
-	if err != nil {
-		t.Fatalf("ensureCodexAuth: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(home, "auth.json"))
-	if err != nil {
-		t.Fatalf("read auth.json: %v", err)
-	}
-	content := string(data)
-
-	for _, want := range []string{
-		`"OPENAI_API_KEY": "sk-test-key-123"`,
-		`"auth_mode": "apikey"`,
-	} {
-		if !strings.Contains(content, want) {
-			t.Errorf("auth.json missing %q\ngot:\n%s", want, content)
-		}
-	}
-}
-
-func TestEnsureCodexAuth_SkipsEmptyKey(t *testing.T) {
-	err := ensureCodexAuth(t.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error for empty key: %v", err)
-	}
-}
-
-func TestEnsureCodexAuth_OverwritesExisting(t *testing.T) {
+func TestStartSession_PreservesOAuthAuth(t *testing.T) {
 	home := filepath.Join(t.TempDir(), ".codex")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"auth_mode":"chatgpt"}`), 0o644); err != nil {
+	original := []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"oauth-access","refresh_token":"oauth-refresh"}}`)
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), original, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	err := ensureCodexAuth(home, "new-api-key")
-	if err != nil {
-		t.Fatalf("ensureCodexAuth: %v", err)
+	agent := &Agent{
+		workDir:   t.TempDir(),
+		model:     "mimo-v2.5",
+		mode:      "full-auto",
+		backend:   "exec",
+		cmd:       "codex",
+		codexHome: home,
+		providers: []core.ProviderConfig{{
+			Name:    "mimo",
+			APIKey:  "sk-test-key",
+			BaseURL: "http://127.0.0.1:8193/v1",
+		}},
+		activeIdx: 0,
 	}
+
+	session, err := agent.StartSession(context.Background(), "")
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	defer session.Close()
 
 	data, err := os.ReadFile(filepath.Join(home, "auth.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	content := string(data)
-
-	if strings.Contains(content, "chatgpt") {
-		t.Errorf("auth.json still has old auth_mode\ngot:\n%s", content)
-	}
-	if !strings.Contains(content, `"auth_mode": "apikey"`) {
-		t.Errorf("auth.json missing apikey mode\ngot:\n%s", content)
-	}
-	if !strings.Contains(content, `"OPENAI_API_KEY": "new-api-key"`) {
-		t.Errorf("auth.json missing new key\ngot:\n%s", content)
+	if string(data) != string(original) {
+		t.Errorf("auth.json changed after API-key provider session\nwant: %s\ngot:  %s", original, data)
 	}
 }

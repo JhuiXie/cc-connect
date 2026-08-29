@@ -7156,7 +7156,8 @@ func (e *Engine) buildReplyFooter(agent Agent, session AgentSession, workspaceDi
 		} else if contextLeft != "" {
 			parts = append(parts, contextLeft)
 			hasStatus = true
-		} else if usage := e.replyFooterUsageText(session, agent); usage != "" {
+		}
+		if usage := e.replyFooterUsageText(session, agent); usage != "" {
 			parts = append(parts, usage)
 			hasStatus = true
 		}
@@ -7179,7 +7180,7 @@ func (e *Engine) buildReplyFooter(agent Agent, session AgentSession, workspaceDi
 // RichCardSupporter.BuildRichCard. Layout (skipping any empty line):
 //
 //	line 1: ⏱ <i18n elapsed>                                  (subject to e.replyFooterEnabled)
-//	line 2: model · out N · in N cw N cr N · ctx N%           (subject to e.showContextIndicator)
+//	line 2: model · out N · in N cw N cr N · ctx N% · quota    (subject to e.showContextIndicator)
 //	line 3: <workdir>                                         (subject to e.showWorkdirIndicator)
 //
 // Returns "" when the master replyFooterEnabled toggle is off, or while the
@@ -7198,12 +7199,15 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 	// Line 1: elapsed timer (now always the "done" form since streaming branch returned above)
 	lines = append(lines, formatElapsed(time.Since(turnStart), streaming, e.i18n.currentLang()))
 
-	// Line 2: model + effort + token usage detail + ctx %
+	// Line 2: model + effort + token usage detail + ctx % + account quota
 	if e.showContextIndicator {
 		usage := replyFooterSessionContextUsage(session)
 		model := replyFooterModel(session, agent)
 		effort := replyFooterReasoningEffort(session, agent)
 		if line := buildClaudeStatusLineFooter(model, effort, usage); line != "" {
+			if quota := e.replyFooterUsageText(session, agent); quota != "" {
+				line += " · " + quota
+			}
 			lines = append(lines, line)
 		} else if fallback := e.replyFooterUsageText(session, agent); fallback != "" {
 			// fallback for non-claudecode agents that still expose UsageReporter
@@ -7384,7 +7388,11 @@ func replyFooterReasoningEffort(session AgentSession, agent Agent) string {
 }
 
 func (e *Engine) replyFooterUsageText(session AgentSession, agent Agent) string {
-	ctx, cancel := context.WithTimeout(e.ctx, replyFooterUsageTimeout)
+	parent := e.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, replyFooterUsageTimeout)
 	defer cancel()
 
 	if session != nil {
@@ -7424,7 +7432,18 @@ func formatReplyFooterUsage(report *UsageReport, i18n *I18n) string {
 	if report == nil || i18n == nil {
 		return ""
 	}
-	window, _ := selectUsageWindows(report)
+	primary, secondary := selectUsageWindows(report)
+	var parts []string
+	if primary != nil {
+		parts = append(parts, formatReplyFooterWindow(primary, i18n.CurrentLang()))
+	}
+	if secondary != nil {
+		parts = append(parts, formatReplyFooterWindow(secondary, i18n.CurrentLang()))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func formatReplyFooterWindow(window *UsageWindow, lang Language) string {
 	if window == nil {
 		return ""
 	}
@@ -7435,7 +7454,42 @@ func formatReplyFooterUsage(report *UsageReport, i18n *I18n) string {
 	if remaining > 100 {
 		remaining = 100
 	}
-	return i18n.Tf(MsgReplyFooterRemaining, remaining)
+
+	label := replyFooterWindowLabel(lang, window.WindowSeconds)
+	switch lang {
+	case LangChinese:
+		return fmt.Sprintf("%s 剩余 %d%%", label, remaining)
+	case LangTraditionalChinese:
+		return fmt.Sprintf("%s 剩餘 %d%%", label, remaining)
+	case LangJapanese:
+		return fmt.Sprintf("%s 残り %d%%", label, remaining)
+	case LangSpanish:
+		return fmt.Sprintf("%s %d%% restante", label, remaining)
+	default:
+		return fmt.Sprintf("%s %d%% left", label, remaining)
+	}
+}
+
+func replyFooterWindowLabel(lang Language, seconds int) string {
+	switch seconds {
+	case 18000:
+		return "5h"
+	case 604800:
+		switch lang {
+		case LangChinese:
+			return "周"
+		case LangTraditionalChinese:
+			return "週"
+		case LangJapanese:
+			return "週間"
+		case LangSpanish:
+			return "semanal"
+		default:
+			return "weekly"
+		}
+	default:
+		return usageWindowLabel(lang, seconds)
+	}
 }
 
 func replyFooterSessionContextUsage(session AgentSession) *ContextUsage {

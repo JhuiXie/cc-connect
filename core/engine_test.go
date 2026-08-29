@@ -1261,6 +1261,10 @@ func TestProcessInteractiveEvents_AppendsReplyFooterWhenEnabled(t *testing.T) {
 					Name:          "Primary",
 					UsedPercent:   0,
 					WindowSeconds: 18000,
+				}, {
+					Name:          "Secondary",
+					UsedPercent:   22,
+					WindowSeconds: 604800,
 				}},
 			}},
 		},
@@ -1286,7 +1290,7 @@ func TestProcessInteractiveEvents_AppendsReplyFooterWhenEnabled(t *testing.T) {
 	if len(sent) != 1 {
 		t.Fatalf("sent = %#v, want one final reply", sent)
 	}
-	want := "answer\n\n*gpt-5.4 · xhigh · 100% left · " + compactReplyFooterPath(workDir) + "*"
+	want := "answer\n\n*gpt-5.4 · xhigh · 5h 100% left · weekly 78% left · " + compactReplyFooterPath(workDir) + "*"
 	if sent[0] != want {
 		t.Fatalf("final reply = %q, want %q", sent[0], want)
 	}
@@ -1515,6 +1519,10 @@ func TestProcessInteractiveEvents_ReplyFooterPrefersSessionRuntimeState(t *testi
 				Name:          "Primary",
 				UsedPercent:   0,
 				WindowSeconds: 18000,
+			}, {
+				Name:          "Secondary",
+				UsedPercent:   22,
+				WindowSeconds: 604800,
 			}},
 		}},
 	}
@@ -1539,7 +1547,7 @@ func TestProcessInteractiveEvents_ReplyFooterPrefersSessionRuntimeState(t *testi
 	if len(sent) != 1 {
 		t.Fatalf("sent = %#v, want one final reply", sent)
 	}
-	want := "answer\n\n*gpt-5.4 · xhigh · 31% left · " + compactReplyFooterPath(sessionWorkDir) + "*"
+	want := "answer\n\n*gpt-5.4 · xhigh · 31% left · 5h 100% left · weekly 78% left · " + compactReplyFooterPath(sessionWorkDir) + "*"
 	if sent[0] != want {
 		t.Fatalf("final reply = %q, want %q", sent[0], want)
 	}

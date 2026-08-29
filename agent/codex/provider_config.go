@@ -1,7 +1,6 @@
 package codex
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -35,37 +34,6 @@ func ensureCodexProviderConfig(codexHome, name, baseURL, wireAPI string, headers
 		return fmt.Errorf("codex: write config.toml: %w", err)
 	}
 	slog.Debug("codex: wrote provider config", "provider", name, "path", cfgPath)
-	return nil
-}
-
-// ensureCodexAuth writes $CODEX_HOME/auth.json with the provider's API key,
-// matching cc-switch's approach: {"OPENAI_API_KEY": "...", "auth_mode": "api_key"}.
-// This is the standard way to authenticate Codex CLI with third-party providers.
-func ensureCodexAuth(codexHome, apiKey string) error {
-	if apiKey == "" {
-		return nil
-	}
-	home, err := resolveCodexHomeForConfig(codexHome)
-	if err != nil {
-		return fmt.Errorf("codex: resolve codex home: %w", err)
-	}
-	if err := os.MkdirAll(home, 0o755); err != nil {
-		return fmt.Errorf("codex: mkdir codex home: %w", err)
-	}
-
-	authPath := filepath.Join(home, "auth.json")
-	payload := map[string]any{
-		"OPENAI_API_KEY": apiKey,
-		"auth_mode":      "apikey",
-	}
-	data, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return fmt.Errorf("codex: marshal auth.json: %w", err)
-	}
-	if err := os.WriteFile(authPath, append(data, '\n'), 0o600); err != nil {
-		return fmt.Errorf("codex: write auth.json: %w", err)
-	}
-	slog.Debug("codex: wrote auth.json", "path", authPath)
 	return nil
 }
 
