@@ -292,6 +292,19 @@ func (a *stubFooterAgent) GetModel() string           { return a.model }
 func (a *stubFooterAgent) GetReasoningEffort() string { return a.effort }
 func (a *stubFooterAgent) GetWorkDir() string         { return a.workDir }
 
+type stubFastFooterAgent struct {
+	stubFooterAgent
+	enabled bool
+}
+
+func (a *stubFastFooterAgent) SetFastMode(enabled bool) {
+	a.enabled = enabled
+}
+
+func (a *stubFastFooterAgent) FastModeStatus() FastModeStatus {
+	return FastModeStatus{Enabled: a.enabled}
+}
+
 // newLegacyFooterEngine returns an Engine with all three footer flags on,
 // suitable for invoking buildReplyFooter directly against the legacy single-
 // line footer path.
@@ -317,6 +330,52 @@ func TestBuildReplyFooter_LegacyAllSegments(t *testing.T) {
 	// Segments joined by " · ".
 	if !strings.Contains(got, " · ") {
 		t.Errorf("legacy footer = %q, expected ' · ' separators", got)
+	}
+}
+
+func TestBuildReplyFooter_LegacyShowsFastOff(t *testing.T) {
+	e := newLegacyFooterEngine()
+	e.i18n = NewI18n(LangEnglish)
+	agent := &stubFastFooterAgent{
+		stubFooterAgent: stubFooterAgent{model: "gpt-5.6-sol", effort: "max", workDir: "/tmp/ws"},
+	}
+
+	got := e.buildReplyFooter(agent, nil, "/tmp/ws", "100% left")
+	if !strings.Contains(got, "gpt-5.6-sol · max · fast:off · 100% left") {
+		t.Fatalf("legacy footer = %q, want fast:off after effort", got)
+	}
+}
+
+func TestComposeRichStatusFooter_ShowsFastOn(t *testing.T) {
+	workDir := "/tmp/ws"
+	agent := &stubFastFooterAgent{
+		stubFooterAgent: stubFooterAgent{model: "gpt-5.6-sol", effort: "max", workDir: workDir},
+		enabled:         true,
+	}
+	e := NewEngine("test", agent, nil, "", LangEnglish)
+	e.SetReplyFooterEnabled(true)
+	e.SetShowContextIndicator(true)
+	e.SetShowWorkdirIndicator(true)
+
+	session := newControllableSession("s-rich-fast-footer")
+	session.model = "gpt-5.6-sol"
+	session.reasoningEffort = "max"
+	session.workDir = workDir
+	session.contextUsage = &ContextUsage{
+		InputTokens:   501_000,
+		OutputTokens:  4_000,
+		UsedTokens:    510_000,
+		ContextWindow: 1_000_000,
+	}
+
+	got := e.composeRichStatusFooter(false, time.Now().Add(-time.Second), agent, session, workDir)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("rich footer lines = %d, want 3: %q", len(lines), got)
+	}
+	want := "gpt-5.6-sol · max · fast:on · out 4.0k · in 501.0k · ctx 51%"
+	if lines[1] != want {
+		t.Fatalf("rich footer line = %q, want %q", lines[1], want)
 	}
 }
 

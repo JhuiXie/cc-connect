@@ -31,6 +31,16 @@ var (
 	buildTime = "unknown"
 )
 
+func startupLogAttrs(projects int, processID int) []any {
+	return []any{
+		"projects", projects,
+		"version", version,
+		"commit", commit,
+		"built", buildTime,
+		"pid", processID,
+	}
+}
+
 // globalAPIServer holds the running API server so the config-reload path can
 // re-apply hot-reloadable settings (e.g. max attachment size) without threading
 // it through the engine's reload closure. nil when the API server is disabled.
@@ -1299,7 +1309,7 @@ func main() {
 		apiSrv.Start()
 	}
 
-	slog.Info("cc-connect is running", "projects", len(engines))
+	slog.Info("cc-connect is running", startupLogAttrs(len(engines), os.Getpid())...)
 
 	// After startup, check if we were restarted and queue the success
 	// notification. The engine dispatches it on the first OnPlatformReady

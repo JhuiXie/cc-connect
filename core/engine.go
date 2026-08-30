@@ -7367,6 +7367,10 @@ func (e *Engine) buildReplyFooter(agent Agent, session AgentSession, workspaceDi
 			parts = append(parts, effort)
 			hasStatus = true
 		}
+		if fast := replyFooterFastMode(agent); fast != "" {
+			parts = append(parts, fast)
+			hasStatus = true
+		}
 		if contextFirst {
 			// Already added before model so "[ctx]" stays on the same footer line.
 		} else if contextLeft != "" {
@@ -7421,6 +7425,17 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 		model := replyFooterModel(session, agent)
 		effort := replyFooterReasoningEffort(session, agent)
 		if line := buildClaudeStatusLineFooter(model, effort, usage); line != "" {
+			if fast := replyFooterFastMode(agent); fast != "" {
+				lineParts := strings.Split(line, " · ")
+				insertAt := 1
+				if effort != "" && len(lineParts) > 1 {
+					insertAt = 2
+				}
+				lineParts = append(lineParts, "")
+				copy(lineParts[insertAt+1:], lineParts[insertAt:])
+				lineParts[insertAt] = fast
+				line = strings.Join(lineParts, " · ")
+			}
 			if quota := e.replyFooterUsageText(session, agent); quota != "" {
 				line += " · " + quota
 			}
@@ -7433,6 +7448,9 @@ func (e *Engine) composeRichStatusFooter(streaming bool, turnStart time.Time, ag
 			}
 			if effort != "" {
 				parts = append(parts, effort)
+			}
+			if fast := replyFooterFastMode(agent); fast != "" {
+				parts = append(parts, fast)
 			}
 			parts = append(parts, fallback)
 			lines = append(lines, strings.Join(parts, " · "))
@@ -7469,15 +7487,11 @@ func buildClaudeStatusLineFooter(model, effort string, usage *ContextUsage) stri
 		parts = append(parts, effort)
 	}
 	if usage != nil {
-		var counts []string
 		if usage.OutputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("out %s", formatStatusTokenCount(usage.OutputTokens)))
+			parts = append(parts, fmt.Sprintf("out %s", formatStatusTokenCount(usage.OutputTokens)))
 		}
 		if usage.InputTokens > 0 {
-			counts = append(counts, fmt.Sprintf("in %s", formatStatusTokenCount(usage.InputTokens)))
-		}
-		if len(counts) > 0 {
-			parts = append(parts, strings.Join(counts, " "))
+			parts = append(parts, fmt.Sprintf("in %s", formatStatusTokenCount(usage.InputTokens)))
 		}
 		if usage.ContextWindow > 0 {
 			used := usage.UsedTokens
@@ -7595,6 +7609,17 @@ func replyFooterReasoningEffort(session AgentSession, agent Agent) string {
 		return strings.TrimSpace(getter.GetReasoningEffort())
 	}
 	return ""
+}
+
+func replyFooterFastMode(agent Agent) string {
+	switcher, ok := agent.(FastModeSwitcher)
+	if !ok {
+		return ""
+	}
+	if switcher.FastModeStatus().Enabled {
+		return "fast:on"
+	}
+	return "fast:off"
 }
 
 func (e *Engine) replyFooterUsageText(session AgentSession, agent Agent) string {
@@ -7875,6 +7900,9 @@ func (e *Engine) buildClaudeStatusLineFooter(agent Agent, session AgentSession, 
 		}
 		if effort := strings.TrimSpace(replyFooterReasoningEffort(session, agent)); effort != "" {
 			line1Parts = append(line1Parts, "effort:"+effort)
+		}
+		if fast := replyFooterFastMode(agent); fast != "" {
+			line1Parts = append(line1Parts, fast)
 		}
 		line1Parts = append(line1Parts, fmt.Sprintf("out %s", formatStatusTokenCount(usage.OutputTokens)))
 		line1Parts = append(line1Parts, fmt.Sprintf("in %s", formatStatusTokenCount(usage.InputTokens)))

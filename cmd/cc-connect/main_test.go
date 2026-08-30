@@ -452,3 +452,23 @@ func TestRunTopLevelCommandUnknown(t *testing.T) {
 		t.Fatal("runTopLevelCommand() handled unknown command")
 	}
 }
+
+func TestStartupLogAttrsIncludesBuildIdentity(t *testing.T) {
+	oldVersion, oldCommit, oldBuildTime := version, commit, buildTime
+	version, commit, buildTime = "v-test", "abc123", "2026-08-30T00:00:00Z"
+	t.Cleanup(func() {
+		version, commit, buildTime = oldVersion, oldCommit, oldBuildTime
+	})
+
+	got := startupLogAttrs(6, 4242)
+	want := []any{
+		"projects", 6,
+		"version", "v-test",
+		"commit", "abc123",
+		"built", "2026-08-30T00:00:00Z",
+		"pid", 4242,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("startupLogAttrs() = %#v, want %#v", got, want)
+	}
+}
