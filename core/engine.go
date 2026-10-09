@@ -86,6 +86,10 @@ const closeTimeout = 150 * time.Second
 const (
 	replyFooterUsageTimeout  = 1500 * time.Millisecond
 	replyFooterUsageCacheTTL = 30 * time.Second
+	// replyFooterUsageRefreshTimeout bounds a background quota refresh. Some
+	// agents (Claude Code) scrape /usage from a spawned CLI, which takes
+	// several seconds, far beyond the footer's synchronous budget.
+	replyFooterUsageRefreshTimeout = 60 * time.Second
 )
 
 const (
@@ -113,6 +117,9 @@ type RestartRequest struct {
 type replyFooterUsageCache struct {
 	text      string
 	fetchedAt time.Time
+	// refreshing is non-nil while a background refresh is in flight and is
+	// closed when it finishes.
+	refreshing chan struct{}
 }
 
 // SaveRestartNotify persists restart info so the new process can send
@@ -7643,24 +7650,56 @@ func (e *Engine) replyFooterUsageText(session AgentSession, agent Agent) string 
 		return ""
 	}
 
+	// Stale-while-revalidate: once any result is cached the footer never
+	// waits on the agent; a stale cache only kicks off a background refresh.
+	// Only the very first lookup waits (bounded by ctx) so fast reporters
+	// still show quota on the first reply.
 	e.replyFooterMu.Lock()
 	cached := e.replyFooterUsage
+	done := cached.refreshing
+	if done == nil && (cached.fetchedAt.IsZero() || time.Since(cached.fetchedAt) >= replyFooterUsageCacheTTL) {
+		done = make(chan struct{})
+		e.replyFooterUsage.refreshing = done
+		go e.refreshReplyFooterUsage(reporter, done)
+	}
 	e.replyFooterMu.Unlock()
-	if !cached.fetchedAt.IsZero() && time.Since(cached.fetchedAt) < replyFooterUsageCacheTTL {
+
+	if !cached.fetchedAt.IsZero() {
 		return cached.text
 	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
+	e.replyFooterMu.Lock()
+	defer e.replyFooterMu.Unlock()
+	return e.replyFooterUsage.text
+}
 
-	text := ""
+func (e *Engine) refreshReplyFooterUsage(reporter UsageReporter, done chan struct{}) {
+	parent := e.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, replyFooterUsageRefreshTimeout)
+	defer cancel()
+
+	text, fetched := "", false
 	if report, err := reporter.GetUsage(ctx); err == nil {
-		text = formatReplyFooterUsage(report, e.i18n)
-	} else if !cached.fetchedAt.IsZero() {
-		text = cached.text
+		text, fetched = formatReplyFooterUsage(report, e.i18n), true
+	} else {
+		slog.Debug("reply footer usage refresh failed", "error", err)
 	}
 
 	e.replyFooterMu.Lock()
+	if !fetched {
+		// Keep the last good text; still stamp the time so a failing
+		// reporter is retried at most once per TTL.
+		text = e.replyFooterUsage.text
+	}
 	e.replyFooterUsage = replyFooterUsageCache{text: text, fetchedAt: time.Now()}
 	e.replyFooterMu.Unlock()
-	return text
+	close(done)
 }
 
 func formatReplyFooterUsage(report *UsageReport, i18n *I18n) string {
