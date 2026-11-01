@@ -259,10 +259,16 @@ func (a *Agent) configuredModels() []core.ModelOption {
 }
 
 func (a *Agent) AvailableModels(ctx context.Context) []core.ModelOption {
-	if models := readCodexModelCatalog(); len(models) > 0 {
-		return models
-	}
+	// Provider-configured models win over the shared Codex catalog. The catalog
+	// (model_catalog_json) is a single global, provider-agnostic list, so
+	// consulting it first made /model keep showing GPT models after switching to
+	// a non-OpenAI provider (deepseek/mimo/glm/...). Providers that declare no
+	// [[providers.models]] (or none at all) still fall back to the catalog,
+	// which keeps the plain OpenAI setup unchanged.
 	if models := a.configuredModels(); len(models) > 0 {
+		return withCatalogDescriptions(models, readCodexModelCatalog())
+	}
+	if models := readCodexModelCatalog(); len(models) > 0 {
 		return models
 	}
 	if models := a.fetchModelsFromAPI(ctx); len(models) > 0 {
@@ -279,6 +285,34 @@ func (a *Agent) AvailableModels(ctx context.Context) []core.ModelOption {
 		{Name: "gpt-4.1-nano", Desc: "GPT-4.1 Nano (fastest)"},
 		{Name: "codex-mini-latest", Desc: "Codex Mini (code-optimized)"},
 	}
+}
+
+// withCatalogDescriptions copies the Codex catalog's human-readable description
+// onto provider-configured models that do not carry one of their own. The
+// selection (which models are offered) always comes from the provider config;
+// only missing descriptions are filled in, so /model keeps the readable labels
+// without letting the catalog decide the list contents.
+func withCatalogDescriptions(models, catalog []core.ModelOption) []core.ModelOption {
+	if len(models) == 0 || len(catalog) == 0 {
+		return models
+	}
+	descriptions := make(map[string]string, len(catalog))
+	for _, c := range catalog {
+		if c.Name != "" && c.Desc != "" {
+			descriptions[c.Name] = c.Desc
+		}
+	}
+	out := make([]core.ModelOption, len(models))
+	copy(out, models)
+	for i := range out {
+		if out[i].Desc != "" {
+			continue
+		}
+		if desc, ok := descriptions[out[i].Name]; ok {
+			out[i].Desc = desc
+		}
+	}
+	return out
 }
 
 // nonChatSubstrings identifies non chat/completion modalities returned by
