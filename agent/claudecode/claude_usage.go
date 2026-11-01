@@ -140,8 +140,13 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 	}()
 
 	terminal := newClaudeUsageTerminal()
+	// readDone carries the reader's single result and may be consumed by the
+	// loop below; readerExited is closed when the reader returns, so cleanup can
+	// wait on it no matter who received from readDone.
 	readDone := make(chan error, 1)
+	readerExited := make(chan struct{})
 	go func() {
+		defer close(readerExited)
 		buf := make([]byte, 4096)
 		for {
 			n, err := ptmx.Read(buf)
@@ -158,11 +163,6 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 			}
 		}
 	}()
-
-	// readerExited records whether the main loop already received from readDone. readDone is
-	// written exactly once; the old deferred `<-readDone` blocked forever after the loop had
-	// consumed it, freezing the caller (and with it the whole platform receive loop).
-	readerExited := false
 
 	defer func() {
 		// Order: let claude exit gracefully, close the pty, then wait (bounded) for the reader.
@@ -187,12 +187,11 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 			slog.Warn("claudeSession: close ptmx", "error", err)
 		}
 		// On macOS a child may inherit the pty slave, so Read may not return right after Close.
-		if !readerExited {
-			select {
-			case <-readDone:
-			case <-time.After(claudeUsageCleanupWait):
-				slog.Warn("claudeSession: usage probe reader still blocked; leaking goroutine")
-			}
+		// Bounded wait: leaking the reader goroutine is better than freezing the caller.
+		select {
+		case <-readerExited:
+		case <-time.After(claudeUsageCleanupWait):
+			slog.Warn("claudeSession: usage probe reader still blocked; leaking goroutine")
 		}
 	}()
 
@@ -219,7 +218,6 @@ func (a *Agent) runClaudeUsageProbe(ctx context.Context) (string, error) {
 			}
 			return "", fmt.Errorf("claudecode: timed out waiting for Claude Code /usage panel: %w", probeCtx.Err())
 		case err := <-readCh:
-			readerExited = true
 			// Disable this case (a nil channel blocks forever) and keep waiting for processDone.
 			// readDone itself is left untouched for the reader goroutine and the deferred cleanup.
 			readCh = nil
