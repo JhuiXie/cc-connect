@@ -224,6 +224,8 @@ func (a *Agent) AvailableReasoningEfforts() []string {
 }
 
 var fastModeModels = []string{
+	"gpt-6.2-sol",
+	"gpt-6.2-astra",
 	"gpt-5.6-luna",
 	"gpt-5.6-sol",
 	"gpt-5.6-terra",
@@ -294,7 +296,9 @@ func (a *Agent) AvailableModels(ctx context.Context) []core.ModelOption {
 
 func defaultCodexModels() []core.ModelOption {
 	return []core.ModelOption{
-		{Name: "gpt-6.1-sol", Desc: "GPT-6.1 Sol (latest Sol model)"},
+		{Name: "gpt-6.2-sol", Desc: "GPT-6.2 Sol (coding and everyday work)"},
+		{Name: "gpt-6.2-astra", Desc: "GPT-6.2 Astra (complex coding and professional work)"},
+		{Name: "gpt-6.1-sol", Desc: "GPT-6.1 Sol"},
 		{Name: "gpt-6-astra", Desc: "GPT-6 Astra"},
 		{Name: "gpt-6-sol", Desc: "GPT-6 Sol"},
 		{Name: "gpt-6-luna", Desc: "GPT-6 Luna"},

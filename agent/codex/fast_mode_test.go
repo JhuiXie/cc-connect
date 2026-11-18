@@ -12,6 +12,8 @@ func TestSupportsFastModeModel(t *testing.T) {
 		model string
 		want  bool
 	}{
+		{model: "gpt-6.2-sol", want: true},
+		{model: "gpt-6.2-astra", want: true},
 		{model: "gpt-5.6-luna", want: true},
 		{model: "gpt-5.6-sol", want: true},
 		{model: "gpt-5.6-terra", want: true},
@@ -53,7 +55,7 @@ func TestFastModeStatusRequiresOpenAIProviderAndSupportedModel(t *testing.T) {
 	if !status.Enabled {
 		t.Fatal("FastModeStatus enabled = false, want true")
 	}
-	wantModels := []string{"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"}
+	wantModels := []string{"gpt-6.2-sol", "gpt-6.2-astra", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"}
 	if !reflect.DeepEqual(status.SupportedModels, wantModels) {
 		t.Fatalf("supported models = %v, want %v", status.SupportedModels, wantModels)
 	}
